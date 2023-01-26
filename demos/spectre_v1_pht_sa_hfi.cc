@@ -27,6 +27,12 @@
 const char *public_data = "Hello, world!";
 const char private_data[] __attribute__ ((aligned (128))) = "It's a s3kr3t!!!";
 
+// Uncomment to enable hfi emulation
+// #define HFI_EMULATION3
+
+// outside the root folder of this repo
+#include "../hw_isol_gem5/tests/test-progs/hfi/hfi.h"
+
 // Leaks the byte that is physically located at &text[0] + offset, without ever
 // loading it. In the abstract machine, and in the code executed by the CPU,
 // this function does not load any memory except for what is in the bounds
@@ -92,11 +98,47 @@ static char LeakByte(const char *data, size_t offset) {
   }
 }
 
+size_t round_to_next_pow2(size_t val) {
+  size_t power = 1;
+  while(power < val) {
+    power *= 2;
+  }
+  return power;
+}
+
 int main() {
+  hfi_sandbox sandbox;
+  memset(&sandbox, 0, sizeof(hfi_sandbox));
+
+  sandbox.is_trusted_sandbox = false;
+
+  sandbox.code_ranges[0].base_mask = 0;
+  sandbox.code_ranges[0].ignore_mask = 0;
+  sandbox.code_ranges[0].executable = 1;
+
+  // First region --- mark private_data as inaccessible
+  const size_t private_data_len = strlen(private_data);
+  const size_t private_data_len_pow2 = round_to_next_pow2(private_data_len);
+  sandbox.data_ranges[0].base_mask = reinterpret_cast<uintptr_t>(private_data);
+  sandbox.data_ranges[0].ignore_mask = ~reinterpret_cast<uint64_t>(private_data_len_pow2 - 1);
+  sandbox.data_ranges[0].readable = 0;
+  sandbox.data_ranges[0].writeable = 0;
+
+  // Second region --- mark all (remaining) addresses as accessible
+  sandbox.data_ranges[1].base_mask = 0;
+  sandbox.data_ranges[1].ignore_mask = 0;
+  sandbox.data_ranges[1].readable = 1;
+  sandbox.data_ranges[1].writeable = 1;
+
+  hfi_set_sandbox_metadata(&sandbox);
+  hfi_enter_sandbox();
+
+  puts("Running poc after hfi protections");
+
   std::cout << "Leaking the string: ";
   std::cout.flush();
   const size_t private_offset = private_data - public_data;
-  for (size_t i = 0; i < strlen(private_data); ++i) {
+  for (size_t i = 0; i < private_data_len; ++i) {
     // On at least some machines, this will print the i'th byte from
     // private_data, despite the only actually-executed memory accesses being
     // to valid bytes in public_data.
@@ -104,4 +146,6 @@ int main() {
     std::cout.flush();
   }
   std::cout << "\nDone!\n";
+
+  hfi_exit_sandbox();
 }

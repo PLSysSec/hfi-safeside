@@ -128,10 +128,15 @@ function(add_demo demo_name)
 
   add_executable(${demo_name} ${demo_name}.cc ${ARG_ADDITIONAL_SOURCES})
   target_link_libraries(${demo_name} safeside)
+  message(CMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+  target_include_directories(${demo_name} PRIVATE ${CMAKE_SOURCE_DIR})
 endfunction()
 
 # Spectre V1 PHT SA -- mistraining PHT in the same address space
 add_demo(spectre_v1_pht_sa)
+
+# Spectre V1 PHT SA -- mistraining PHT in the same address space , prevented by HFI
+add_demo(spectre_v1_pht_sa_hfi)
 
 # Spectre V1 BTB SA -- mistraining BTB in the same address space
 add_demo(spectre_v1_btb_sa)
