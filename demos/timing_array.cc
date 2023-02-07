@@ -47,6 +47,9 @@ void TimingArray::FlushFromCache() {
   MemoryAndSpeculationBarrier();
 }
 
+uint64_t saved_threadhold{0};
+uint64_t saved_char_latencies[256] {0};
+
 int TimingArray::FindFirstCachedElementIndexAfter(int start_after) {
   // Fail if element is out of bounds.
   if (start_after >= size()) {
@@ -58,6 +61,14 @@ int TimingArray::FindFirstCachedElementIndexAfter(int start_after) {
   for (int i = 1; i <= size(); ++i) {
     int el = (start_after + i) % size();
     uint64_t read_latency = MeasureReadLatency(&ElementAt(el));
+    saved_char_latencies[el] = read_latency;
+  }
+
+  saved_threadhold = cached_read_latency_threshold_;
+
+  for (int i = 1; i <= size(); ++i) {
+    int el = (start_after + i) % size();
+    uint64_t read_latency = saved_char_latencies[el];
     if (read_latency <= cached_read_latency_threshold_) {
       return el;
     }

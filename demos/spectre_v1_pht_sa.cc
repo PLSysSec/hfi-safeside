@@ -87,6 +87,13 @@ static char LeakByte(const char *data, size_t offset) {
 
     if (run > 100) {
       std::cerr << "Does not converge" << std::endl;
+      std::cout << "Threshold: " << saved_threadhold << "\n";
+      std::cout << "[";
+      for (size_t i = 0; i < 256; i++) {
+        const char * sep = i == 0? "" : ", ";
+        std::cout << sep << saved_char_latencies[i];
+      }
+      std::cout << "]\n";
       exit(EXIT_FAILURE);
     }
   }
@@ -104,4 +111,14 @@ int main() {
     std::cout.flush();
   }
   std::cout << "\nDone!\n";
+
+  std::cout << "Printing latencies for the first byte: " << LeakByte(public_data, private_offset) << "\n";
+
+  std::cout << "Threshold: " << saved_threadhold << "\n";
+  std::cout << "[";
+  for (size_t i = 0; i < 256; i++) {
+    const char * sep = i == 0? "" : ", ";
+    std::cout << sep << saved_char_latencies[i];
+  }
+  std::cout << "]\n";
 }
