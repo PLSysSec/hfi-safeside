@@ -54,6 +54,9 @@
 // [1] See e.g. Intel's documentation at https://cpu.fyi/d/83c#G3.1121453,
 //   which says data is only prefetched if it is on the "same 4K byte page".
 
+extern uint64_t saved_threadhold;
+extern uint64_t saved_char_latencies[256];
+
 class TimingArray {
  public:
   // ValueType is an alias for the element type of the array. Someday we might

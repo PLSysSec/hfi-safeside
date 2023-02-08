@@ -138,6 +138,9 @@ add_demo(spectre_v1_pht_sa)
 # Spectre V1 PHT SA -- mistraining PHT in the same address space , prevented by HFI
 add_demo(spectre_v1_pht_sa_hfi)
 
+# Spectre V1 PHT SA -- output latencies for first secret character access with and without HFI
+add_demo(spectre_v1_pht_sa_latencies)
+
 # Spectre V1 BTB SA -- mistraining BTB in the same address space
 add_demo(spectre_v1_btb_sa)
 

