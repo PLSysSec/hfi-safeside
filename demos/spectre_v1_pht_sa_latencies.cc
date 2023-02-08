@@ -118,7 +118,7 @@ void printLatencyForFirstByte() {
 
   uint64_t avg_char_latencies[256]{0};
   std::cout << "Printing latencies for the first byte: " << LeakByte(public_data, private_offset, avg_char_latencies) << ". Should be 'I' if HFI disabled, incorrect char if HFI enabled.\n";
-  std::cout << "Threshold: " << saved_threadhold << "\n";
+  std::cout << "Threshold: " << 2*saved_threadhold << "\n";
   // std::cout << "Runs taken: " << out_runs_taken << "\n";
   std::cout << "[";
   for (size_t i = 0; i < 256; i++) {
