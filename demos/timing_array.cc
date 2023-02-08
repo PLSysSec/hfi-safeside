@@ -48,7 +48,7 @@ void TimingArray::FlushFromCache() {
 }
 
 uint64_t saved_threadhold{0};
-uint64_t saved_char_latencies[256] {0};
+uint64_t saved_char_latencies[256]{0};
 
 int TimingArray::FindFirstCachedElementIndexAfter(int start_after) {
   // Fail if element is out of bounds.
