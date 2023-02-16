@@ -17,8 +17,12 @@ for i in range(0, 256):
         print("HFI latency below at: " + chr(i))
 
 
+plt.rcParams['pdf.fonttype'] = 42 # true type font
+# plt.rcParams['font.family'] = 'Linux Libertine'
+plt.rcParams['font.size'] = '7'
+
 plt.figure()
-fig, ax = plt.subplots(figsize=(5,3.5))
+fig, ax = plt.subplots(figsize=(5,2))
 plt.plot(x, original_latencies, color='#D7191C', label='Avg. access latency (no protections)')
 
 for i in range(0, 256):
@@ -36,6 +40,6 @@ ax.set_xlabel('ASCII code')
 ax.set_ylabel('Avg. access latency (cycles)')
 
 ax.set_xlim(left=0)
-ax.set_ylim(top=240)
+ax.set_ylim(top=250)
 plt.tight_layout()
 plt.savefig("spectre-pht-signal.pdf", format="pdf", bbox_inches="tight", pad_inches=0)
